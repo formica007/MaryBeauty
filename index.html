@@ -240,8 +240,9 @@
                 </div>
             </div>
             
-            <div class="admin-layout flex flex-col gap-6 lg:grid lg:grid-cols-3 lg:gap-8">
-                <div class="admin-section admin-section-config order-1">
+            <div class="admin-layout flex flex-col gap-6 lg:grid lg:grid-cols-2 lg:gap-8">
+                <div class="admin-section admin-section-config">
+
                     <div class="glass-morphism p-6 border-2 border-pink-50">
                         <h3 class="text-[10px] font-bold uppercase mb-4 opacity-40">Configurazione</h3>
                         <div class="space-y-4">
@@ -266,7 +267,8 @@
                     </div>
                 </div>
 
-                <div class="admin-section admin-section-services order-2 lg:col-span-2">
+                <div class="admin-section admin-section-services">
+
                     <div class="glass-morphism p-6 border border-stone-100">
                         <h3 class="text-[10px] font-bold uppercase mb-6 opacity-40">Aggiungi Nuovo Servizio</h3>
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
@@ -283,7 +285,8 @@
                     </div>
                 </div>
 
-                <div class="admin-section admin-section-calendar order-3">
+                <div class="admin-section admin-section-calendar">
+
                     <div class="glass-morphism p-6 border-2 border-stone-100">
                         <h3 class="text-[10px] font-bold uppercase mb-4 opacity-40">Gestione Calendario Speciale</h3>
                         <input type="date" id="special-date-input" class="m-input mb-4">
@@ -295,11 +298,13 @@
                     </div>
                 </div>
 
-                <div class="admin-section admin-section-clear order-4">
+                <div class="admin-section admin-section-clear">
+
                     <button onclick="showDeleteModal()" class="w-full bg-red-50 text-red-500 border border-red-100 py-3 rounded-xl text-[9px] font-bold uppercase hover:bg-red-500 hover:text-white transition-all">Svuota Tutta l'Agenda</button>
                 </div>
 
-                <div class="admin-section admin-section-bookings order-5 lg:col-span-2">
+                <div class="admin-section admin-section-bookings"> 
+
                     <h3 class="text-[10px] font-bold uppercase mb-6 opacity-40">Lista Prenotazioni</h3>
                     <div id="admin-bookings-container" class="space-y-8"></div>
                 </div>
