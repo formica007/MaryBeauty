@@ -160,7 +160,8 @@
             .admin-layout {
                 display: grid !important;
                 grid-template-columns: 1fr 1fr;
-                gap: 2rem;
+                column-gap: 2rem;
+                row-gap: 0.85rem;
                 align-items: start;
             }
             .admin-section-config { grid-column: 1; grid-row: 1; order: 0 !important; }
@@ -168,6 +169,12 @@
             .admin-section-calendar { grid-column: 1; grid-row: 2; order: 0 !important; }
             .admin-section-clear { grid-column: 1; grid-row: 3; order: 0 !important; }
             .admin-section-bookings { grid-column: 2; grid-row: 2 / span 2; order: 0 !important; }
+            .admin-section-clear button {
+                width: auto !important;
+                padding: 0.6rem 1.5rem !important;
+                font-size: 0.65rem !important;
+                border-radius: 999px !important;
+            }
         }
     </style>
 </head>
