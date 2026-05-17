@@ -405,13 +405,34 @@
             window.toastTimeout = setTimeout(() => toast.classList.remove('show'), duration);
         }
 
+        function isAdminUser() {
+            return !!currentUser?.isAdmin;
+        }
+
+        function requireAdmin(actionLabel = 'questa azione') {
+            if(isAdminUser()) return true;
+            showToast(`Accesso non autorizzato per ${actionLabel}.`);
+            return false;
+        }
+
+        function getPublicSettingsPayload() {
+            return {
+                pause: parseInt(settings.pause, 10) || 0,
+                closingTime: settings.closingTime || '19:30',
+                blockedDates: settings.blockedDates || [],
+                extraDates: settings.extraDates || []
+            };
+        }
+
         async function loadSettings() {
             try {
                 const snap = await getDoc(doc(db, "settings", "calendar"));
                 if(snap.exists()) {
-                    settings = { ...settings, ...snap.data() };
-                    if(!settings.adminUsername) settings.adminUsername = 'mery';
-                    if(!settings.adminPin) settings.adminPin = '1234';
+                    const data = snap.data();
+                    settings.pause = data.pause ?? settings.pause;
+                    settings.closingTime = data.closingTime ?? settings.closingTime;
+                    settings.blockedDates = Array.isArray(data.blockedDates) ? data.blockedDates : [];
+                    settings.extraDates = Array.isArray(data.extraDates) ? data.extraDates : [];
                 }
             } catch (error) {
                 console.error('Errore caricamento impostazioni:', error);
@@ -419,27 +440,27 @@
             }
             document.getElementById('cfg-pause').value = settings.pause;
             document.getElementById('cfg-close').value = settings.closingTime;
-            const adminUsernameInput = document.getElementById('admin-username');
-            const adminPinInput = document.getElementById('admin-pin');
-            if(adminUsernameInput) adminUsernameInput.value = settings.adminUsername;
-            if(adminPinInput) adminPinInput.value = settings.adminPin;
             renderSpecialDates();
         }
 
+        async function savePublicSettings(extra = {}) {
+            const payload = { ...getPublicSettingsPayload(), ...extra };
+            await setDoc(doc(db, "settings", "calendar"), payload, { merge: true });
+        }
+
         window.saveConfig = async () => {
-            settings.pause = parseInt(document.getElementById('cfg-pause').value) || 0;
-            settings.closingTime = document.getElementById('cfg-close').value || "19:30";
-            const adminUsernameInput = document.getElementById('admin-username');
-            const adminPinInput = document.getElementById('admin-pin');
-            const adminUsernameValue = adminUsernameInput ? adminUsernameInput.value.trim() : '';
-            const adminPinValue = adminPinInput ? adminPinInput.value.trim() : '';
-            settings.adminUsername = adminUsernameValue || settings.adminUsername;
-            settings.adminPin = adminPinValue || settings.adminPin;
-            await setDoc(doc(db, "settings", "calendar"), settings);
-            showToast("Impostazioni salvate!");
+            if(!requireAdmin('salvare la configurazione')) return;
+            settings.pause = parseInt(document.getElementById('cfg-pause').value, 10) || 0;
+            settings.closingTime = document.getElementById('cfg-close').value || '19:30';
+            await savePublicSettings({
+                adminUsername: deleteField(),
+                adminPin: deleteField()
+            });
+            showToast('Impostazioni salvate!');
         };
 
         window.toggleDateStatus = async (type) => {
+            if(!requireAdmin('modificare il calendario')) return;
             const date = document.getElementById('special-date-input').value;
             if(!date) return;
             if(type === 'blocked') {
@@ -449,7 +470,7 @@
                 if(settings.extraDates.includes(date)) settings.extraDates = settings.extraDates.filter(d => d !== date);
                 else { settings.extraDates.push(date); settings.blockedDates = settings.blockedDates.filter(d => d !== date); }
             }
-            await setDoc(doc(db, "settings", "calendar"), settings);
+            await savePublicSettings();
             renderSpecialDates();
             initCalendar();
         };
@@ -462,6 +483,7 @@
         }
 
         window.addService = async () => {
+            if(!requireAdmin('gestire i servizi')) return;
             const titolo = document.getElementById('s-title').value.trim();
             const durata = document.getElementById('s-duration').value.trim();
             const icona = document.getElementById('s-icon').value.trim();
@@ -483,10 +505,12 @@
         };
 
         window.deleteService = async (id) => {
+            if(!requireAdmin('eliminare i servizi')) return;
             if(confirm("Eliminare questo servizio?")) { await deleteDoc(doc(db, "servizi", id)); loadServices(); }
         };
 
         window.editService = async (id) => {
+            if(!requireAdmin('modificare i servizi')) return;
             try {
                 const snap = await getDoc(doc(db, 'servizi', id));
                 if(!snap.exists()) return showToast('Servizio non trovato.');
@@ -713,6 +737,7 @@
         }
 
         window.showDeleteModal = () => {
+            if(!requireAdmin('svuotare l\'agenda')) return;
             const modal = document.getElementById('delete-confirm-modal');
             modal.style.display = 'flex';
             modal.classList.remove('hidden');
@@ -725,6 +750,7 @@
             modal.classList.add('hidden');
         };
         window.executeTotalDelete = async () => {
+            if(!requireAdmin('svuotare l\'agenda')) return;
             if(document.getElementById('delete-verify-input').value.toUpperCase() === "DELETE") {
                 const snap = await getDocs(collection(db, "prenotazioni"));
                 for (const d of snap.docs) { await deleteDoc(doc(db, "prenotazioni", d.id)); }
@@ -871,18 +897,6 @@
             const pass = document.getElementById('auth-password').value;
             const rememberMe = document.getElementById('remember-me').checked;
             if(!email || !pass) return showToast('Inserisci email e password valide.');
-            
-            // Controlla prima se sono credenziali admin
-            await loadSettings();
-            if(email.toLowerCase() === settings.adminUsername.toLowerCase() && pass === settings.adminPin) {
-                currentUser = { isAdmin: true, name: settings.adminUsername };
-                updateUserUI(currentUser);
-                closeAuth();
-                showToast('Accesso admin eseguito.');
-                return;
-            }
-            
-            // Altrimenti procedi con login cliente
             try {
                 await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
                 await signInWithEmailAndPassword(auth, email, pass);
@@ -897,36 +911,18 @@
             }
         };
 
-        window.loginAdmin = async () => {
-            const username = document.getElementById('auth-admin-username').value.trim().toLowerCase();
-            const pin = document.getElementById('auth-admin-pin').value.trim();
-            if(!username || !pin) return showToast('Inserisci username e PIN admin.');
-            await loadSettings();
-            if(username === settings.adminUsername.toLowerCase() && pin === settings.adminPin) {
-                currentUser = { isAdmin: true, name: settings.adminUsername };
-                updateUserUI(currentUser);
-                closeAuth();
-                showToast('Accesso admin eseguito.');
-            } else {
-                showToast('Credenziali admin non corrette.');
-            }
-        };
-
         window.logoutUser = async () => {
-            const adminPanel = document.getElementById('admin-panel');
-            const userPanel = document.getElementById('user-panel');
-            if(currentUser?.isAdmin) {
-                currentUser = null;
-                updateUserUI(null);
+            try {
+                if(auth.currentUser) await signOut(auth);
+                else {
+                    currentUser = null;
+                    await updateUserUI(null);
+                }
                 showToast('Logout eseguito.');
-                adminPanel.classList.add('hidden');
-                adminPanel.style.display = 'none';
-                return;
+            } catch (error) {
+                console.error('Errore logout:', error);
+                showToast('Errore durante il logout.');
             }
-            await signOut(auth);
-            showToast('Logout eseguito.');
-            userPanel.classList.add('hidden');
-            userPanel.style.display = 'none';
         };
 
         window.forgotPassword = async () => {
@@ -1075,7 +1071,10 @@
             }
         }
 
-        window.deleteB = async (id) => { if(confirm("Cancellare appuntamento?")) { await deleteDoc(doc(db, "prenotazioni", id)); loadAdminBookings(); } };
+        window.deleteB = async (id) => {
+            if(!requireAdmin('cancellare le prenotazioni')) return;
+            if(confirm("Cancellare appuntamento?")) { await deleteDoc(doc(db, "prenotazioni", id)); loadAdminBookings(); }
+        };
 
         onAuthStateChanged(auth, async (user) => {
             await updateUserUI(user);
