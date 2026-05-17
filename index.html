@@ -341,8 +341,8 @@
                 <button id="auth-register-tab" onclick="switchAuthTab('register')" class="auth-mode-tab">Registrati</button>
             </div>
             <div id="auth-login-panel" class="space-y-4">
-                <input type="email" id="auth-email" placeholder="Email" class="m-input text-center py-4">
-                <input type="password" id="auth-password" placeholder="Password" class="m-input text-center py-4">
+                <input type="text" id="auth-email" placeholder="Nome admin o email cliente" class="m-input text-center py-4" autocomplete="username">
+                <input type="password" id="auth-password" placeholder="Password o PIN admin" class="m-input text-center py-4" autocomplete="current-password">
                 <div class="flex items-center justify-between text-[10px] text-stone-500 px-4">
                     <label class="inline-flex items-center gap-2">
                         <input type="checkbox" id="remember-me" class="h-4 w-4 rounded border-stone-300 text-pink-500 focus:ring-pink-500">
@@ -365,7 +365,7 @@
 
         <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, query, where, doc, deleteDoc, orderBy, setDoc, getDoc, deleteField } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, query, where, doc, deleteDoc, orderBy, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, browserSessionPersistence, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
         const fromStore = (v) => atob(v);
@@ -386,7 +386,7 @@
         let currentBooking = { duration: 0, date: '', time: '', sName: '' };
         let editingServiceId = null;
         let pendingCancelBookingId = null;
-        let settings = { pause: 10, closingTime: "19:30", blockedDates: [], extraDates: [] };
+        let settings = { pause: 10, closingTime: "19:30", blockedDates: [], extraDates: [], adminUsername: 'mary', adminPin: '1234' };
         const fallbackServices = [
             { titolo: 'Trattamento Viso', durata: '60', icona: '💆', descrizione: 'Rigenera pelle e luminosità dal primo momento' },
             { titolo: 'Manicure Deluxe', durata: '45', icona: '💅', descrizione: 'Unghie perfette con finitura brillante' },
@@ -405,34 +405,22 @@
             window.toastTimeout = setTimeout(() => toast.classList.remove('show'), duration);
         }
 
-        function isAdminUser() {
-            return !!currentUser?.isAdmin;
-        }
-
-        function requireAdmin(actionLabel = 'questa azione') {
-            if(isAdminUser()) return true;
-            showToast(`Accesso non autorizzato per ${actionLabel}.`);
-            return false;
-        }
-
-        function getPublicSettingsPayload() {
-            return {
-                pause: parseInt(settings.pause, 10) || 0,
-                closingTime: settings.closingTime || '19:30',
-                blockedDates: settings.blockedDates || [],
-                extraDates: settings.extraDates || []
-            };
+        function isAdminCredentialMatch(username, pin) {
+            const inputUser = (username || '').trim().toLowerCase();
+            const inputPin = (pin || '').trim();
+            const savedUser = (settings.adminUsername || 'mary').trim().toLowerCase();
+            const savedPin = (settings.adminPin || '1234').trim();
+            const aliases = new Set([savedUser, 'mary', 'mery']);
+            return aliases.has(inputUser) && inputPin === savedPin;
         }
 
         async function loadSettings() {
             try {
                 const snap = await getDoc(doc(db, "settings", "calendar"));
                 if(snap.exists()) {
-                    const data = snap.data();
-                    settings.pause = data.pause ?? settings.pause;
-                    settings.closingTime = data.closingTime ?? settings.closingTime;
-                    settings.blockedDates = Array.isArray(data.blockedDates) ? data.blockedDates : [];
-                    settings.extraDates = Array.isArray(data.extraDates) ? data.extraDates : [];
+                    settings = { ...settings, ...snap.data() };
+                    if(!settings.adminUsername) settings.adminUsername = 'mary';
+                    if(!settings.adminPin) settings.adminPin = '1234';
                 }
             } catch (error) {
                 console.error('Errore caricamento impostazioni:', error);
@@ -440,27 +428,27 @@
             }
             document.getElementById('cfg-pause').value = settings.pause;
             document.getElementById('cfg-close').value = settings.closingTime;
+            const adminUsernameInput = document.getElementById('admin-username');
+            const adminPinInput = document.getElementById('admin-pin');
+            if(adminUsernameInput) adminUsernameInput.value = settings.adminUsername;
+            if(adminPinInput) adminPinInput.value = settings.adminPin;
             renderSpecialDates();
         }
 
-        async function savePublicSettings(extra = {}) {
-            const payload = { ...getPublicSettingsPayload(), ...extra };
-            await setDoc(doc(db, "settings", "calendar"), payload, { merge: true });
-        }
-
         window.saveConfig = async () => {
-            if(!requireAdmin('salvare la configurazione')) return;
-            settings.pause = parseInt(document.getElementById('cfg-pause').value, 10) || 0;
-            settings.closingTime = document.getElementById('cfg-close').value || '19:30';
-            await savePublicSettings({
-                adminUsername: deleteField(),
-                adminPin: deleteField()
-            });
-            showToast('Impostazioni salvate!');
+            settings.pause = parseInt(document.getElementById('cfg-pause').value) || 0;
+            settings.closingTime = document.getElementById('cfg-close').value || "19:30";
+            const adminUsernameInput = document.getElementById('admin-username');
+            const adminPinInput = document.getElementById('admin-pin');
+            const adminUsernameValue = adminUsernameInput ? adminUsernameInput.value.trim() : '';
+            const adminPinValue = adminPinInput ? adminPinInput.value.trim() : '';
+            settings.adminUsername = adminUsernameValue || settings.adminUsername;
+            settings.adminPin = adminPinValue || settings.adminPin;
+            await setDoc(doc(db, "settings", "calendar"), settings);
+            showToast("Impostazioni salvate!");
         };
 
         window.toggleDateStatus = async (type) => {
-            if(!requireAdmin('modificare il calendario')) return;
             const date = document.getElementById('special-date-input').value;
             if(!date) return;
             if(type === 'blocked') {
@@ -470,7 +458,7 @@
                 if(settings.extraDates.includes(date)) settings.extraDates = settings.extraDates.filter(d => d !== date);
                 else { settings.extraDates.push(date); settings.blockedDates = settings.blockedDates.filter(d => d !== date); }
             }
-            await savePublicSettings();
+            await setDoc(doc(db, "settings", "calendar"), settings);
             renderSpecialDates();
             initCalendar();
         };
@@ -483,7 +471,6 @@
         }
 
         window.addService = async () => {
-            if(!requireAdmin('gestire i servizi')) return;
             const titolo = document.getElementById('s-title').value.trim();
             const durata = document.getElementById('s-duration').value.trim();
             const icona = document.getElementById('s-icon').value.trim();
@@ -505,12 +492,10 @@
         };
 
         window.deleteService = async (id) => {
-            if(!requireAdmin('eliminare i servizi')) return;
             if(confirm("Eliminare questo servizio?")) { await deleteDoc(doc(db, "servizi", id)); loadServices(); }
         };
 
         window.editService = async (id) => {
-            if(!requireAdmin('modificare i servizi')) return;
             try {
                 const snap = await getDoc(doc(db, 'servizi', id));
                 if(!snap.exists()) return showToast('Servizio non trovato.');
@@ -737,7 +722,6 @@
         }
 
         window.showDeleteModal = () => {
-            if(!requireAdmin('svuotare l\'agenda')) return;
             const modal = document.getElementById('delete-confirm-modal');
             modal.style.display = 'flex';
             modal.classList.remove('hidden');
@@ -750,7 +734,6 @@
             modal.classList.add('hidden');
         };
         window.executeTotalDelete = async () => {
-            if(!requireAdmin('svuotare l\'agenda')) return;
             if(document.getElementById('delete-verify-input').value.toUpperCase() === "DELETE") {
                 const snap = await getDocs(collection(db, "prenotazioni"));
                 for (const d of snap.docs) { await deleteDoc(doc(db, "prenotazioni", d.id)); }
@@ -897,6 +880,17 @@
             const pass = document.getElementById('auth-password').value;
             const rememberMe = document.getElementById('remember-me').checked;
             if(!email || !pass) return showToast('Inserisci email e password valide.');
+            
+            await loadSettings();
+            if(isAdminCredentialMatch(email, pass)) {
+                currentUser = { isAdmin: true, name: settings.adminUsername || 'mary' };
+                updateUserUI(currentUser);
+                closeAuth();
+                showToast('Accesso admin eseguito.');
+                return;
+            }
+            
+            // Altrimenti procedi con login cliente
             try {
                 await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
                 await signInWithEmailAndPassword(auth, email, pass);
@@ -912,17 +906,20 @@
         };
 
         window.logoutUser = async () => {
-            try {
-                if(auth.currentUser) await signOut(auth);
-                else {
-                    currentUser = null;
-                    await updateUserUI(null);
-                }
+            const adminPanel = document.getElementById('admin-panel');
+            const userPanel = document.getElementById('user-panel');
+            if(currentUser?.isAdmin) {
+                currentUser = null;
+                updateUserUI(null);
                 showToast('Logout eseguito.');
-            } catch (error) {
-                console.error('Errore logout:', error);
-                showToast('Errore durante il logout.');
+                adminPanel.classList.add('hidden');
+                adminPanel.style.display = 'none';
+                return;
             }
+            await signOut(auth);
+            showToast('Logout eseguito.');
+            userPanel.classList.add('hidden');
+            userPanel.style.display = 'none';
         };
 
         window.forgotPassword = async () => {
@@ -1071,10 +1068,7 @@
             }
         }
 
-        window.deleteB = async (id) => {
-            if(!requireAdmin('cancellare le prenotazioni')) return;
-            if(confirm("Cancellare appuntamento?")) { await deleteDoc(doc(db, "prenotazioni", id)); loadAdminBookings(); }
-        };
+        window.deleteB = async (id) => { if(confirm("Cancellare appuntamento?")) { await deleteDoc(doc(db, "prenotazioni", id)); loadAdminBookings(); } };
 
         onAuthStateChanged(auth, async (user) => {
             await updateUserUI(user);
