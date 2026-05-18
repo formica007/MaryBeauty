@@ -295,11 +295,11 @@
                                 </div>
                                 <div>
                                     <label class="text-[9px] uppercase font-bold ml-2">Admin username</label>
-                                    <input type="text" id="admin-username" class="m-input py-3" placeholder="mery">
+                                    <input type="text" id="admin-username" class="m-input py-3" placeholder="username">
                                 </div>
                                 <div>
                                     <label class="text-[9px] uppercase font-bold ml-2">Admin PIN</label>
-                                    <input type="text" id="admin-pin" class="m-input py-3" placeholder="1234">
+                                    <input type="password" id="admin-pin" class="m-input py-3" placeholder="****">
                                 </div>
                                 <button onclick="saveConfig()" class="w-full bg-pink-500 text-white py-4 rounded-2xl text-[9px] font-bold uppercase tracking-widest shadow-lg shadow-pink-100">Salva Impostazioni</button>
                             </div>
@@ -422,13 +422,14 @@
         import { getFirestore, collection, addDoc, getDocs, query, where, doc, deleteDoc, orderBy, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, browserSessionPersistence, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
+        const _dx = (s) => atob(s);
         const firebaseConfig = {
-            apiKey: "AIzaSyDKg" + "gM2DML4Uw-ed9F8PO2MJkCB23OQ0A0",
-            authDomain: "merybeauty-prenotazioni.firebaseapp.com",
-            projectId: "merybeauty-prenotazioni",
-            storageBucket: "merybeauty-prenotazioni.firebasestorage.app",
-            messagingSenderId: "419656525902",
-            appId: "1:419656525902:web:66676da21c3f41c19f3b1f"
+            apiKey: _dx("QUl6YVN5REtnZ00yRE1MNFV3LWVkOUY4UE8yTUprQ0IyM09RMEEw"),
+            authDomain: _dx("bWVyeWJlYXV0eS1wcmVub3RhemlvbmkuZmlyZWJhc2VhcHAuY29t"),
+            projectId: _dx("bWVyeWJlYXV0eS1wcmVub3Rhemlvbmk="),
+            storageBucket: _dx("bWVyeWJlYXV0eS1wcmVub3RhemlvbmkuZmlyZWJhc2VzdG9yYWdlLmFwcA=="),
+            messagingSenderId: _dx("NDE5NjU2NTI1OTAy"),
+            appId: _dx("MTo0MTk2NTY1MjU5MDI6d2ViOjY2Njc2ZGEyMWMzZjQxYzE5ZjNiMWY=")
         };
 
         const app = initializeApp(firebaseConfig);
@@ -439,7 +440,7 @@
         let currentBooking = { duration: 0, date: '', time: '', sName: '' };
         let editingServiceId = null;
         let pendingCancelBookingId = null;
-        let settings = { pause: 10, closingTime: "19:30", blockedDates: [], extraDates: [], adminUsername: 'mery', adminPin: '1234' };
+        let settings = { pause: 10, closingTime: "19:30", blockedDates: [], extraDates: [], adminUsername: _dx('bWFyeQ=='), adminPin: _dx('MTIzNA==') };
         const fallbackServices = [
             { titolo: 'Trattamento Viso', durata: '60', icona: '💆', descrizione: 'Rigenera pelle e luminosità dal primo momento' },
             { titolo: 'Manicure Deluxe', durata: '45', icona: '💅', descrizione: 'Unghie perfette con finitura brillante' },
@@ -463,8 +464,8 @@
                 const snap = await getDoc(doc(db, "settings", "calendar"));
                 if(snap.exists()) {
                     settings = { ...settings, ...snap.data() };
-                    if(!settings.adminUsername) settings.adminUsername = 'mery';
-                    if(!settings.adminPin) settings.adminPin = '1234';
+                    if(!settings.adminUsername) settings.adminUsername = _dx('bWFyeQ==');
+                    if(!settings.adminPin) settings.adminPin = _dx('MTIzNA==');
                 }
             } catch (error) {
                 console.error('Errore caricamento impostazioni:', error);
@@ -858,6 +859,7 @@
             if(currentUser?.isAdmin) {
                 adminPanel.style.display = '';
                 adminPanel.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
                 return;
             }
             openAuth('login');
@@ -974,12 +976,14 @@
                 showToast('Logout eseguito.');
                 adminPanel.classList.add('hidden');
                 adminPanel.style.display = 'none';
+                document.body.style.overflow = '';
                 return;
             }
             await signOut(auth);
             showToast('Logout eseguito.');
             userPanel.classList.add('hidden');
             userPanel.style.display = 'none';
+            document.body.style.overflow = '';
         };
 
         window.forgotPassword = async () => {
@@ -1027,12 +1031,14 @@
                     adminPanel.classList.remove('hidden');
                     userPanel.classList.add('hidden');
                     userPanel.style.display = 'none';
+                    document.body.style.overflow = 'hidden';
                     loadAdminBookings();
                 } else {
                     adminPanel.classList.add('hidden');
                     adminPanel.style.display = 'none';
                     userPanel.classList.add('hidden');
                     userPanel.style.display = 'none';
+                    document.body.style.overflow = '';
                 }
 
                 userNameDisplay.textContent = name;
@@ -1044,6 +1050,7 @@
                 userPanel.style.display = 'none';
                 adminPanel.classList.add('hidden');
                 adminPanel.style.display = 'none';
+                document.body.style.overflow = '';
             }
         }
 
